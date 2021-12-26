@@ -263,7 +263,8 @@ export class CKQommand implements ISlashCommand {
 
     private async mamaaa(args: Array<string>): Promise<void> {
         return this.sugar('help')
-            ? await this.gimmeSomeSugar('help')?.executor(
+            ? /* papa help?*/
+              await this.gimmeSomeSugar('help')?.executor(
                   this.context,
                   this.read,
                   this.modify,
@@ -271,7 +272,10 @@ export class CKQommand implements ISlashCommand {
                   this.persis,
                   args
               )
-            : await this.notifySender({text: `unknown command ${args.join(' ')}`})
+            : /* papa no help */
+              await this.notifySender({
+                  text: `unknown command ${args.join(' ')}`
+              })
     }
 
     private sugar(command: string): boolean {
@@ -287,6 +291,10 @@ export class CKQHelp extends CKQommand {
         super()
     }
 
+    public banner(): string {
+        return `${'-'.repeat(15)}\n|  *CKQ HELP!!*  |\n${'-'.repeat(15)}\n`
+    }
+
     public async executor(
         context: SlashCommandContext,
         read: IRead,
@@ -297,12 +305,12 @@ export class CKQHelp extends CKQommand {
     ): Promise<void> {
         let text = ''
         if (args && args.length > 0) {
-            text += `unknown command \`${args?.join(
-                ' '
-            )}\` ...nothing to do...please run \`/bbb [command]...[subcommand] help\` for a list of available commands and their description.\n`
+            text += `unknown command \`${args?.join(' ')}\` ...nothing to do...please run \`/${
+                this.slash?.command
+            } [command]...[subcommand] help\` for a list of available commands and their description.\n`
         }
 
-        text += `${'-'.repeat(30)}\n|  *BBB x Rocket.Chat HELP!*  |\n${'-'.repeat(30)}\n`
+        text += this.banner()
         text += `\`${this.parent?.command}\`: ${this.parent?.i18nDescription}\n`
         text += '`'.repeat(3).concat('\n')
 
