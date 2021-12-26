@@ -5,3 +5,4 @@
 !.prettierrc
 !tsconfig.json
 !tslint.json
+!.editorconfig
