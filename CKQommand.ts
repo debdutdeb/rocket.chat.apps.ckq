@@ -20,7 +20,10 @@ export class CKQommand implements ISlashCommand {
     // honestly this isn't necessary
     // i just wanted to name the main method flyingChickens
     // pls don't ask why :"D
-    public commands = this.flyingChickens
+    public readonly commands = this.flyingChickens
+    // other similar stuff
+    public readonly hasCommand = this.sugar
+    public readonly hasCommands = this.cryingChildren
 
     private readonly commandMap: Map<string, CKQommand> = new Map()
     private readonly allowedRoles: Array<string> = ['admin']
@@ -29,7 +32,7 @@ export class CKQommand implements ISlashCommand {
     private readonly __app?: App
 
     private __parent: CKQommand | null = null
-    private __slash: CKQommand
+    private __slash: {__?: CKQommand}
 
     private __me: IUser
     private __sender: IUser
@@ -50,39 +53,39 @@ export class CKQommand implements ISlashCommand {
     }
 
     get slash() {
-        return this.__slash
+        return this.__slash.__
     }
 
     get me() {
-        return this.__slash.__me
+        return this.slash?.__me as IUser
     }
 
     get sender() {
-        return this.__slash.__sender
+        return this.slash?.__sender as IUser
     }
 
     get room() {
-        return this.__slash.__room
+        return this.slash?.__room as IRoom
     }
 
     get context() {
-        return this.__slash.__context
+        return this.slash?.__context as SlashCommandContext
     }
 
     get read() {
-        return this.__slash.__read
+        return this.slash?.__read as IRead
     }
 
     get modify() {
-        return this.__slash.__modify
+        return this.slash?.__modify as IModify
     }
 
     get http() {
-        return this.__slash.__http
+        return this.slash?.__http as IHttp
     }
 
     get persis() {
-        return this.__slash.__persis
+        return this.slash?.__persis as IPersistence
     }
 
     // tslint:disable-next-line: variable-name
@@ -114,9 +117,8 @@ export class CKQommand implements ISlashCommand {
                 this.__http = http
                 this.__persis = persis
                 args = context.getArguments()
+                this.__slash.__ = this
             }
-
-            this.__slash = this.parent?.__slash || this
 
             await this.singLullaby(args as Array<string>)
         }
@@ -150,6 +152,10 @@ export class CKQommand implements ISlashCommand {
         persis: IPersistence
     ): Promise<void>
 
+    public async notifySenderSimple(text: string): Promise<void> {
+        await this.notifySender({text})
+    }
+
     public async notifySender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
         return await this.modify.getNotifier().notifyUser(this.sender, {
             sender: this.me,
@@ -177,17 +183,23 @@ export class CKQommand implements ISlashCommand {
     }
 
     public allowed(): boolean {
-        return !this.hidden ?? this.notafraud()
+        return !this.hidden ? true : this.notafraud()
     }
 
     protected registerCommand(handler: CKQommand): void {
         handler.__parent = this
+
+        this.__slash = handler.__slash =
+            this.__slash ?? handler.__slash ?? (this.__slash = handler.__slash = {})
+
         this.commandMap.set(handler.command, handler)
+
+        // console.log('command:', this.command, 'is __slash empty:', this.__slash === undefined)
     }
 
     private *flyingChickens() {
         for (const command of this.commandMap) {
-            yield command[1]
+            yield command
         }
     }
 
@@ -209,6 +221,7 @@ export class CKQommand implements ISlashCommand {
             )
         }
         const [command, ...commandArgs]: Array<string> = args
+
         const handler: CKQommand | undefined = this.gimmeSomeSugar(command)
 
         if (handler === undefined) {
@@ -237,6 +250,7 @@ export class CKQommand implements ISlashCommand {
 
     private gimmeSomeSugar(name: string): CKQommand | undefined {
         const handler: CKQommand | undefined = this.commandMap.get(name)
+
         if (handler?.allowed()) {
             return handler
         }
@@ -248,18 +262,20 @@ export class CKQommand implements ISlashCommand {
     }
 
     private async mamaaa(args: Array<string>): Promise<void> {
-        return (
-            // papa help?
-            (await this.gimmeSomeSugar('help')?.executor(
-                this.context,
-                this.read,
-                this.modify,
-                this.http,
-                this.persis,
-                args
-            )) || // papa no help
-            (await this.notifySender({text: `\`${args.join(' ')}\` command not found`}))
-        )
+        return this.sugar('help')
+            ? await this.gimmeSomeSugar('help')?.executor(
+                  this.context,
+                  this.read,
+                  this.modify,
+                  this.http,
+                  this.persis,
+                  args
+              )
+            : await this.notifySender({text: `unknown command ${args.join(' ')}`})
+    }
+
+    private sugar(command: string): boolean {
+        return this.commandMap.has(command)
     }
 }
 
@@ -290,16 +306,14 @@ export class CKQHelp extends CKQommand {
         text += `\`${this.parent?.command}\`: ${this.parent?.i18nDescription}\n`
         text += '`'.repeat(3).concat('\n')
 
-        for (const command of this.parent?.commands() || this.commands()) {
-            if (command.allowed()) {
-                text += `${' '.repeat(4)}${command.command}:\n${' '.repeat(8)}${
-                    command.i18nDescription
-                }\n`
+        for (const [command, handler] of this.parent?.commands() || this.commands()) {
+            if (handler.allowed()) {
+                text += `${' '.repeat(4)}${command}:\n${' '.repeat(8)}${handler.i18nDescription}\n`
             }
         }
 
         text += '`'.repeat(3)
-        this.notifySender({text})
+        await this.notifySenderSimple(text)
     }
 }
 
