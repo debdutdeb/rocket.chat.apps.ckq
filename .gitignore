@@ -2,3 +2,6 @@
 */
 !CKQommand.ts
 !.gitignore
+!.prettierrc
+!tsconfig.json
+!tslint.json
