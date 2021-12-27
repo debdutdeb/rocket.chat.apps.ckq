@@ -152,8 +152,8 @@ export class CKQommand implements ISlashCommand {
         persis: IPersistence
     ): Promise<void>
 
-    public async notifySenderSimple(text: string): Promise<void> {
-        await this.notifySender({text})
+    public async notifySenderSimple(...text: Array<string>): Promise<void> {
+        await this.notifySender({text: text.join(' ')})
     }
 
     public async notifySender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
@@ -287,12 +287,12 @@ export class CKQommand implements ISlashCommand {
 export class CKQHelp extends CKQommand {
     public command: string = 'help'
 
+    // prettier-ignore
+    public banner: (() => Promise<string>) | string
+        = `${'-'.repeat(15)}\n|  *CKQ HELP!!*  |\n${'-'.repeat(15)}\n`
+
     constructor() {
         super()
-    }
-
-    public banner(): string {
-        return `${'-'.repeat(15)}\n|  *CKQ HELP!!*  |\n${'-'.repeat(15)}\n`
     }
 
     public async executor(
@@ -310,7 +310,7 @@ export class CKQHelp extends CKQommand {
             } [command]...[subcommand] help\` for a list of available commands and their description.\n`
         }
 
-        text += this.banner()
+        text += typeof this.banner === 'string' ? this.banner : await this.banner()
         text += `\`${this.parent?.command}\`: ${this.parent?.i18nDescription}\n`
         text += '`'.repeat(3).concat('\n')
 
