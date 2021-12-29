@@ -36,6 +36,8 @@ class CKQommand implements ISlashCommand {
     public readonly hasCommand = this.sugar
     public readonly hasCommands = this.cryingChildren
 
+    protected readonly getSettingValue = this.setting.getValue
+
     private readonly commandMap: Map<string, CKQommand> = new Map()
     private readonly allowedRoles: Array<string> = ['admin']
 
@@ -54,7 +56,7 @@ class CKQommand implements ISlashCommand {
     private __http: IHttp
     private __persis: IPersistence
 
-    private __settings: CKQSetting
+    private __setting: CKQSetting
     // tslint:enaable: variable-name
 
     protected get app() {
@@ -101,8 +103,8 @@ class CKQommand implements ISlashCommand {
         return this.slash?.__persis as IPersistence
     }
 
-    protected get settings() {
-        return this.slash?.__settings as CKQSetting
+    protected get setting() {
+        return this.slash?.__setting as CKQSetting
     }
 
     // tslint:disable-next-line: variable-name
@@ -135,7 +137,7 @@ class CKQommand implements ISlashCommand {
                 this.__persis = persis
                 args = context.getArguments()
                 this.__slash.__ = this
-                this.__settings = new CKQSetting(this.app as App)
+                this.__setting = new CKQSetting(this.app as App)
             }
 
             await this.singLullaby(args as Array<string>)
@@ -369,19 +371,19 @@ class CKQSetting {
         this.__accessors = app.getAccessors()
     }
 
-    get read() {
+    protected get read() {
         return this.__accessors.reader
     }
 
-    get http() {
+    protected get http() {
         return this.__accessors.http
     }
 
-    get environment() {
+    protected get environment() {
         return this.__accessors.environmentReader
     }
 
-    get endpoints() {
+    protected get endpoints() {
         return this.__accessors.providedApiEndpoints
     }
 
