@@ -1,5 +1,6 @@
 import {
     IAppAccessors,
+    IConfigurationExtend,
     IEnvironmentRead,
     IHttp,
     IModify,
@@ -38,8 +39,6 @@ class CKQommand implements ISlashCommand {
     public readonly hasCommand = this.sugar
     public readonly hasCommands = this.cryingChildren
 
-    protected readonly getSettingValue = this.setting.getValue
-
     private readonly commandMap: Map<string, CKQommand> = new Map()
     private readonly allowedRoles: Array<string> = ['admin']
 
@@ -47,7 +46,7 @@ class CKQommand implements ISlashCommand {
     private readonly __app?: App
 
     private __parent: CKQommand | null = null
-    private __slash: {__?: CKQommand}
+    private __slash: {__?: CKQommand} = {}
 
     private __me: IUser
     private __sender: IUser
@@ -173,6 +172,28 @@ class CKQommand implements ISlashCommand {
         http: IHttp,
         persis: IPersistence
     ): Promise<void>
+
+    public async notifySenderSuccessSimple(...text: Array<string>): Promise<void> {
+        return await this.notifySender({
+            attachments: [
+                {
+                    color: 'green',
+                    text: text.join(' ')
+                }
+            ]
+        })
+    }
+
+    public async notifySenderFailureSimple(...text: Array<string>): Promise<void> {
+        return await this.notifySender({
+            attachments: [
+                {
+                    color: 'red',
+                    text: text.join(' ')
+                }
+            ]
+        })
+    }
 
     public async notifySenderSimple(...text: Array<string>): Promise<void> {
         await this.notifySender({text: text.join(' ')})
@@ -356,7 +377,7 @@ type ICKQSettingValueCorrectFunction = (
     accessors?: IAppAccessors
 ) => Promise<ICKQSettingValue>
 
-type ICKQSettingValueFromFunction = (accessors: IAppAccessors) => Promise<ICKQSettingValue>
+type ICKQSettingValueFromFunction = (accessors?: IAppAccessors) => Promise<ICKQSettingValue>
 
 type ICKQSetting = Optional<ISetting, 'packageValue'> & {
     correct?: ICKQSettingValueCorrectFunction
@@ -437,6 +458,18 @@ class CKQSetting {
         return setting.correct
             ? setting.correct(await this.environment.getSettings().getValueById(setting.id))
             : await this.environment.getSettings().getValueById(setting.id)
+    }
+
+    public async registerSettings(
+        configuration: IConfigurationExtend,
+        settings: Array<ICKQSetting>
+    ): Promise<void> {
+        await Promise.all(
+            settings.map(
+                async (setting: ICKQSetting) =>
+                    await configuration.settings.provideSetting(await this.getSetting(setting))
+            )
+        )
     }
 }
 
