@@ -1,10 +1,12 @@
 import {
     IAppAccessors,
+    IEnvironmentRead,
     IHttp,
     IModify,
     IPersistence,
     IRead
 } from '@rocket.chat/apps-engine/definition/accessors'
+import {IApiEndpointMetadata} from '@rocket.chat/apps-engine/definition/api'
 import {App} from '@rocket.chat/apps-engine/definition/App'
 import {IMessage} from '@rocket.chat/apps-engine/definition/messages'
 import {IRoom} from '@rocket.chat/apps-engine/definition/rooms'
@@ -59,51 +61,51 @@ class CKQommand implements ISlashCommand {
     private __setting: CKQSetting
     // tslint:enaable: variable-name
 
-    protected get app() {
-        return this.__app
+    protected get app(): App {
+        return this.__app as App
     }
 
-    protected get parent() {
+    protected get parent(): CKQommand | null {
         return this.__parent
     }
 
-    protected get slash() {
-        return this.__slash.__
+    protected get slash(): CKQommand {
+        return this.__slash.__ as CKQommand
     }
 
-    protected get me() {
+    protected get me(): IUser {
         return this.slash?.__me as IUser
     }
 
-    protected get sender() {
+    protected get sender(): IUser {
         return this.slash?.__sender as IUser
     }
 
-    protected get room() {
+    protected get room(): IRoom {
         return this.slash?.__room as IRoom
     }
 
-    protected get context() {
+    protected get context(): SlashCommandContext {
         return this.slash?.__context as SlashCommandContext
     }
 
-    protected get read() {
+    protected get read(): IRead {
         return this.slash?.__read as IRead
     }
 
-    protected get modify() {
+    protected get modify(): IModify {
         return this.slash?.__modify as IModify
     }
 
-    protected get http() {
+    protected get http(): IHttp {
         return this.slash?.__http as IHttp
     }
 
-    protected get persis() {
+    protected get persis(): IPersistence {
         return this.slash?.__persis as IPersistence
     }
 
-    protected get setting() {
+    protected get setting(): CKQSetting {
         return this.slash?.__setting as CKQSetting
     }
 
@@ -371,19 +373,27 @@ class CKQSetting {
         this.__accessors = app.getAccessors()
     }
 
-    protected get read() {
+    protected get app(): App {
+        return this.__app
+    }
+
+    protected get accessors(): IAppAccessors {
+        return this.__accessors
+    }
+
+    protected get read(): IRead {
         return this.__accessors.reader
     }
 
-    protected get http() {
+    protected get http(): IHttp {
         return this.__accessors.http
     }
 
-    protected get environment() {
+    protected get environment(): IEnvironmentRead {
         return this.__accessors.environmentReader
     }
 
-    protected get endpoints() {
+    protected get endpoints(): Array<IApiEndpointMetadata> {
         return this.__accessors.providedApiEndpoints
     }
 
