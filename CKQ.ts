@@ -249,7 +249,7 @@ class CKQommand implements ISlashCommand {
     private __persis: IPersistence
 
     private __setting: CKQSetting
-    // tslint:enaable: variable-name
+    // tslint:enable: variable-name
 
     protected get app(): App {
         return this.__app as App
@@ -319,7 +319,6 @@ class CKQommand implements ISlashCommand {
             // if parent is null, i.e. it is the slashcommand
             // reregister the data
             if (this.parent == null) {
-                console.log('i am slashcommand', this.command)
                 this.__sender = context.getSender()
                 this.__room = context.getRoom()
                 this.__me = (await read.getUserReader().getAppUser()) as IUser
@@ -400,7 +399,6 @@ class CKQommand implements ISlashCommand {
     }
 
     public async notifyUserSimple(user: IUser, text: string): Promise<void> {
-        // console.log(this.parent?.slash.command)
         await notifyUserSimple(
             {
                 read: this.read,
@@ -516,23 +514,23 @@ class CKQommand implements ISlashCommand {
         return this
     }
 
-    public allowed(): boolean {
-        return !this.hidden ? true : this.notafraud()
-    }
-
     protected registerCommand(handler: CKQommand): void {
         handler.__parent = this
 
         this.__slash = handler.__slash = this.__slash || handler.__slash || {}
 
         this.commandMap.set(handler.command, handler)
+    }
 
-        // console.log('command:', this.command, 'is __slash empty:', this.__slash === undefined)
+    private allowed(): boolean {
+        return !this.hidden ? true : this.notafraud()
     }
 
     private *flyingChickens() {
         for (const command of this.commandMap) {
-            yield command
+            if (command[1].allowed()) {
+                yield command
+            }
         }
     }
 
@@ -636,7 +634,6 @@ class CKQHelp extends CKQommand {
         persis: IPersistence,
         args?: Array<string>
     ): Promise<void> {
-        console.log(this.slash === undefined)
         let text = ''
         if (args && args.length > 0) {
             text += `unknown command \`${args?.join(' ')}\` ...nothing to do...please run \`/${
@@ -649,9 +646,7 @@ class CKQHelp extends CKQommand {
         text += '`'.repeat(3).concat('\n')
 
         for (const [command, handler] of this.parent?.commands() || this.commands()) {
-            if (handler.allowed()) {
-                text += `${' '.repeat(4)}${command}:\n${' '.repeat(8)}${handler.i18nDescription}\n`
-            }
+            text += `${' '.repeat(4)}${command}:\n${' '.repeat(8)}${handler.i18nDescription}\n`
         }
 
         text += '`'.repeat(3)
@@ -677,8 +672,10 @@ type ICKQSetting = Optional<ISetting, 'packageValue'> & {
 
 // tslint:disable-next-line: max-classes-per-file
 class CKQSetting {
+    // tslint:disable: variable-name
     private readonly __app: App
     private readonly __accessors: IAppAccessors
+    // tslint:enable: variable-name
 
     constructor(app: App) {
         this.__app = app
@@ -717,11 +714,7 @@ class CKQSetting {
             f: ICKQSettingValueFromFunction,
             s: Optional<ISetting, 'packageValue'>
         ): Promise<{packageValue?: string; values?: Array<ISettingSelectValue>}> => {
-            let st: string = 'packageValue'
-
-            if (s.type === SettingType.SELECT) {
-                st = 'values'
-            }
+            const st: string = s.type === SettingType.SELECT ? 'values' : 'packageValue'
 
             return {
                 [st]:
