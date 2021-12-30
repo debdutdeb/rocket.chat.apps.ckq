@@ -4,13 +4,14 @@ import {
     IEnvironmentRead,
     IHttp,
     IModify,
+    IModifyCreator,
     IPersistence,
     IRead
 } from '@rocket.chat/apps-engine/definition/accessors'
 import {IApiEndpointMetadata} from '@rocket.chat/apps-engine/definition/api'
 import {App} from '@rocket.chat/apps-engine/definition/App'
 import {IMessage} from '@rocket.chat/apps-engine/definition/messages'
-import {IRoom} from '@rocket.chat/apps-engine/definition/rooms'
+import {IRoom, RoomType} from '@rocket.chat/apps-engine/definition/rooms'
 import {
     ISetting,
     ISettingSelectValue,
@@ -77,25 +78,10 @@ const notifyUserSimpleWithColor = async (
     color: string,
     text: string
 ): Promise<void> => {
-    await notifyUser(
-        {
-            read,
-            modify,
-            user,
-            room
-        },
-        {
-            attachments: [
-                {
-                    color,
-                    text
-                }
-            ]
-        }
-    )
+    await notifyUser({read, modify, user, room}, {attachments: [{color, text}]})
 }
 
-const notifyUserSuccessSimple = async (
+const notifyUserOnSuccessSimple = async (
     {
         read,
         modify,
@@ -109,19 +95,10 @@ const notifyUserSuccessSimple = async (
     },
     text: string
 ): Promise<void> => {
-    await notifyUserSimpleWithColor(
-        {
-            read,
-            modify,
-            user,
-            room
-        },
-        'green',
-        text
-    )
+    await notifyUserSimpleWithColor({read, modify, user, room}, 'green', text)
 }
 
-const notifyUserFailureSimple = async (
+const notifyUserOnFailureSimple = async (
     {
         read,
         modify,
@@ -135,16 +112,107 @@ const notifyUserFailureSimple = async (
     },
     text: string
 ): Promise<void> => {
-    await notifyUserSimpleWithColor(
-        {
-            read,
-            modify,
-            user,
-            room
-        },
-        'red',
-        text
+    await notifyUserSimpleWithColor({read, modify, user, room}, 'red', text)
+}
+
+const sendDirectToUser = async (
+    {
+        read,
+        modify,
+        user
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+    },
+    message: Omit<IMessage, 'sender' | 'room'>
+): Promise<void> => {
+    const me = (await read.getUserReader().getAppUser()) as IUser
+
+    const usernames: Array<string> = [user, me].map((u: IUser) => u.username)
+
+    const creator: IModifyCreator = modify.getCreator()
+
+    let room: IRoom = await read.getRoomReader().getDirectByUsernames(usernames)
+
+    if (room === undefined) {
+        const roomId = await creator.finish(
+            creator
+                .startRoom()
+                .setMembersToBeAddedByUsernames(usernames)
+                .setType(RoomType.DIRECT_MESSAGE)
+                .setCreator(me)
+        )
+        room = (await read.getRoomReader().getById(roomId)) as IRoom
+    }
+    await creator.finish(
+        creator.startMessage({
+            room,
+            sender: me,
+            ...message
+        })
     )
+}
+
+const sendDirectToUserSimple = async (
+    {
+        read,
+        modify,
+        user
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+    },
+    text: string
+): Promise<void> => {
+    await sendDirectToUser({read, modify, user}, {text})
+}
+
+const sendDirectToUserSimpleWithColor = async (
+    {
+        read,
+        modify,
+        user
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+    },
+    color: string,
+    text: string
+): Promise<void> => {
+    await sendDirectToUser({read, modify, user}, {attachments: [{color, text}]})
+}
+
+const sendDirectToUserOnSuccessSimple = async (
+    {
+        read,
+        modify,
+        user
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+    },
+    text: string
+): Promise<void> => {
+    await sendDirectToUserSimpleWithColor({read, modify, user}, 'green', text)
+}
+
+const sendDirectToUserOnFailureSimple = async (
+    {
+        read,
+        modify,
+        user
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+    },
+    text: string
+): Promise<void> => {
+    await sendDirectToUserSimpleWithColor({read, modify, user}, 'red', text)
 }
 
 class CKQommand implements ISlashCommand {
@@ -251,6 +319,7 @@ class CKQommand implements ISlashCommand {
             // if parent is null, i.e. it is the slashcommand
             // reregister the data
             if (this.parent == null) {
+                console.log('i am slashcommand', this.command)
                 this.__sender = context.getSender()
                 this.__room = context.getRoom()
                 this.__me = (await read.getUserReader().getAppUser()) as IUser
@@ -298,24 +367,45 @@ class CKQommand implements ISlashCommand {
         persis: IPersistence
     ): Promise<void>
 
-    public async notifySenderSuccessSimple(text: string): Promise<void> {
-        return await notifyUserSuccessSimple(
+    public async notifyUserOnSuccessSimple(user: IUser, text: string): Promise<void> {
+        return await notifyUserOnSuccessSimple(
             {
                 read: this.read,
                 modify: this.modify,
-                user: this.sender,
+                user,
                 room: this.room
             },
             text
         )
     }
 
-    public async notifySenderFailureSimple(text: string): Promise<void> {
-        return await notifyUserFailureSimple(
+    public async notifySenderOnSuccessSimple(text: string): Promise<void> {
+        return await this.notifyUserOnSuccessSimple(this.sender, text)
+    }
+
+    public async notifyUserOnFailureSimple(user: IUser, text: string): Promise<void> {
+        return await notifyUserOnFailureSimple(
             {
                 read: this.read,
                 modify: this.modify,
-                user: this.sender,
+                user,
+                room: this.room
+            },
+            text
+        )
+    }
+
+    public async notifySenderOnFailureSimple(text: string): Promise<void> {
+        return await this.notifyUserOnFailureSimple(this.sender, text)
+    }
+
+    public async notifyUserSimple(user: IUser, text: string): Promise<void> {
+        // console.log(this.parent?.slash.command)
+        await notifyUserSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user,
                 room: this.room
             },
             text
@@ -323,19 +413,7 @@ class CKQommand implements ISlashCommand {
     }
 
     public async notifySenderSimple(text: string): Promise<void> {
-        await notifyUserSimple(
-            {
-                read: this.read,
-                modify: this.modify,
-                user: this.sender,
-                room: this.room
-            },
-            text
-        )
-    }
-
-    public async notifySender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
-        return await this.notifyUser(this.sender, message)
+        return await this.notifyUserSimple(this.sender, text)
     }
 
     public async notifyUser(
@@ -351,6 +429,73 @@ class CKQommand implements ISlashCommand {
             },
             message
         )
+    }
+
+    public async notifySender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
+        return await this.notifyUser(this.sender, message)
+    }
+
+    public async sendDirectToUser(
+        user: IUser,
+        message: Omit<IMessage, 'sender' | 'room'>
+    ): Promise<void> {
+        return await sendDirectToUser(
+            {
+                read: this.read,
+                modify: this.modify,
+                user
+            },
+            message
+        )
+    }
+
+    public async sendDirectToSender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
+        return await this.sendDirectToUser(this.sender, message)
+    }
+
+    public async sendDirectToUserSimple(user: IUser, text: string): Promise<void> {
+        return await sendDirectToUserSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user
+            },
+            text
+        )
+    }
+
+    public async sendDirectToSenderSimple(text: string): Promise<void> {
+        return await this.sendDirectToUserSimple(this.sender, text)
+    }
+
+    public async sendDirectToUserOnSuccessSimple(user: IUser, text: string): Promise<void> {
+        return await sendDirectToUserOnSuccessSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user
+            },
+            text
+        )
+    }
+
+    public async sendDirectToSenderOnSuccessSimple(text: string): Promise<void> {
+        return await this.sendDirectToUserOnSuccessSimple(this.sender, text)
+    }
+
+    public async sendDirectToUserOnFailureSimple(user: IUser, text: string): Promise<void> {
+        return await sendDirectToUserOnFailureSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user
+            },
+            text
+        )
+    }
+
+    public async sendDirectToSenderOnFailureSimple(text: string): Promise<void> {
+        return await this.sendDirectToUserOnFailureSimple(this.sender, text)
     }
 
     public slashCommand(
@@ -381,6 +526,8 @@ class CKQommand implements ISlashCommand {
         this.__slash = handler.__slash = this.__slash || handler.__slash || {}
 
         this.commandMap.set(handler.command, handler)
+
+        // console.log('command:', this.command, 'is __slash empty:', this.__slash === undefined)
     }
 
     private *flyingChickens() {
@@ -489,6 +636,7 @@ class CKQHelp extends CKQommand {
         persis: IPersistence,
         args?: Array<string>
     ): Promise<void> {
+        console.log(this.slash === undefined)
         let text = ''
         if (args && args.length > 0) {
             text += `unknown command \`${args?.join(' ')}\` ...nothing to do...please run \`/${
@@ -626,4 +774,13 @@ export {
     CKQSetting
 }
 
-export {notifyUser, notifyUserSimple, notifyUserSuccessSimple, notifyUserFailureSimple}
+export {
+    notifyUser,
+    notifyUserSimple,
+    notifyUserOnSuccessSimple,
+    notifyUserOnFailureSimple,
+    sendDirectToUser,
+    sendDirectToUserSimple,
+    sendDirectToUserOnSuccessSimple,
+    sendDirectToUserOnFailureSimple
+}
