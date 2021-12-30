@@ -24,6 +24,129 @@ import {
 } from '@rocket.chat/apps-engine/definition/slashcommands'
 import {IUser} from '@rocket.chat/apps-engine/definition/users'
 
+const notifyUser = async (
+    {
+        read,
+        modify,
+        user,
+        room
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+        room: IRoom
+    },
+    message: Omit<IMessage, 'sender' | 'room'>
+): Promise<void> => {
+    await modify.getNotifier().notifyUser(user, {
+        sender: (await read.getUserReader().getAppUser()) as IUser,
+        room,
+        ...message
+    })
+}
+
+const notifyUserSimple = async (
+    {
+        read,
+        modify,
+        user,
+        room
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+        room: IRoom
+    },
+    text: string
+): Promise<void> => {
+    await notifyUser({read, modify, user, room}, {text})
+}
+
+const notifyUserSimpleWithColor = async (
+    {
+        read,
+        modify,
+        user,
+        room
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+        room: IRoom
+    },
+    color: string,
+    text: string
+): Promise<void> => {
+    await notifyUser(
+        {
+            read,
+            modify,
+            user,
+            room
+        },
+        {
+            attachments: [
+                {
+                    color,
+                    text
+                }
+            ]
+        }
+    )
+}
+
+const notifyUserSuccessSimple = async (
+    {
+        read,
+        modify,
+        user,
+        room
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+        room: IRoom
+    },
+    text: string
+): Promise<void> => {
+    await notifyUserSimpleWithColor(
+        {
+            read,
+            modify,
+            user,
+            room
+        },
+        'green',
+        text
+    )
+}
+
+const notifyUserFailureSimple = async (
+    {
+        read,
+        modify,
+        user,
+        room
+    }: {
+        read: IRead
+        modify: IModify
+        user: IUser
+        room: IRoom
+    },
+    text: string
+): Promise<void> => {
+    await notifyUserSimpleWithColor(
+        {
+            read,
+            modify,
+            user,
+            room
+        },
+        'red',
+        text
+    )
+}
+
 class CKQommand implements ISlashCommand {
     public command: string
     public i18nDescription: string
@@ -46,7 +169,7 @@ class CKQommand implements ISlashCommand {
     private readonly __app?: App
 
     private __parent: CKQommand | null = null
-    private __slash: {__?: CKQommand} = {}
+    private __slash: {__?: CKQommand}
 
     private __me: IUser
     private __sender: IUser
@@ -136,9 +259,11 @@ class CKQommand implements ISlashCommand {
                 this.__modify = modify
                 this.__http = http
                 this.__persis = persis
-                args = context.getArguments()
-                this.__slash.__ = this
                 this.__setting = new CKQSetting(this.app as App)
+                this.__slash = this.__slash || {__: this}
+                this.__slash.__ = this.__slash.__ || this
+
+                args = context.getArguments()
             }
 
             await this.singLullaby(args as Array<string>)
@@ -173,38 +298,59 @@ class CKQommand implements ISlashCommand {
         persis: IPersistence
     ): Promise<void>
 
-    public async notifySenderSuccessSimple(...text: Array<string>): Promise<void> {
-        return await this.notifySender({
-            attachments: [
-                {
-                    color: 'green',
-                    text: text.join(' ')
-                }
-            ]
-        })
+    public async notifySenderSuccessSimple(text: string): Promise<void> {
+        return await notifyUserSuccessSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user: this.sender,
+                room: this.room
+            },
+            text
+        )
     }
 
-    public async notifySenderFailureSimple(...text: Array<string>): Promise<void> {
-        return await this.notifySender({
-            attachments: [
-                {
-                    color: 'red',
-                    text: text.join(' ')
-                }
-            ]
-        })
+    public async notifySenderFailureSimple(text: string): Promise<void> {
+        return await notifyUserFailureSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user: this.sender,
+                room: this.room
+            },
+            text
+        )
     }
 
-    public async notifySenderSimple(...text: Array<string>): Promise<void> {
-        await this.notifySender({text: text.join(' ')})
+    public async notifySenderSimple(text: string): Promise<void> {
+        await notifyUserSimple(
+            {
+                read: this.read,
+                modify: this.modify,
+                user: this.sender,
+                room: this.room
+            },
+            text
+        )
     }
 
     public async notifySender(message: Omit<IMessage, 'sender' | 'room'>): Promise<void> {
-        return await this.modify.getNotifier().notifyUser(this.sender, {
-            sender: this.me,
-            room: this.room,
-            ...message
-        })
+        return await this.notifyUser(this.sender, message)
+    }
+
+    public async notifyUser(
+        user: IUser,
+        message: Omit<IMessage, 'sender' | 'room'>
+    ): Promise<void> {
+        return await notifyUser(
+            {
+                read: this.read,
+                modify: this.modify,
+                user,
+                room: this.room
+            },
+            message
+        )
     }
 
     public slashCommand(
@@ -232,12 +378,9 @@ class CKQommand implements ISlashCommand {
     protected registerCommand(handler: CKQommand): void {
         handler.__parent = this
 
-        this.__slash = handler.__slash =
-            this.__slash ?? handler.__slash ?? (this.__slash = handler.__slash = {})
+        this.__slash = handler.__slash = this.__slash || handler.__slash || {}
 
         this.commandMap.set(handler.command, handler)
-
-        // console.log('command:', this.command, 'is __slash empty:', this.__slash === undefined)
     }
 
     private *flyingChickens() {
@@ -482,3 +625,5 @@ export {
     ICKQSettingValueFromFunction,
     CKQSetting
 }
+
+export {notifyUser, notifyUserSimple, notifyUserSuccessSimple, notifyUserFailureSimple}
