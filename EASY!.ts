@@ -345,6 +345,7 @@ class EasyAppCommand implements ISlashCommand {
     ): Promise<void> {
         return await sendDirectToUser(
             {
+                read: this.read,
                 sender: this.me,
                 modify: this.modify,
                 user
@@ -360,6 +361,7 @@ class EasyAppCommand implements ISlashCommand {
     protected async sendDirectToUserSimple(user: IUser, text: string): Promise<void> {
         return await sendDirectToUserSimple(
             {
+                read: this.read,
                 sender: this.me,
                 modify: this.modify,
                 user
@@ -375,6 +377,7 @@ class EasyAppCommand implements ISlashCommand {
     protected async sendDirectToUserOnSuccessSimple(user: IUser, text: string): Promise<void> {
         return await sendDirectToUserOnSuccessSimple(
             {
+                read: this.read,
                 sender: this.me,
                 modify: this.modify,
                 user
@@ -390,6 +393,7 @@ class EasyAppCommand implements ISlashCommand {
     protected async sendDirectToUserOnFailureSimple(user: IUser, text: string): Promise<void> {
         return await sendDirectToUserOnFailureSimple(
             {
+                read: this.read,
                 sender: this.me,
                 modify: this.modify,
                 user
@@ -685,15 +689,17 @@ const sendDirectToUser = async (
     args: ImplicitOrExplicitMessageSenderArgs,
     message: Omit<IMessage, 'sender' | 'room'>
 ): Promise<void> => {
-    const {context, read, modify, user} = args
+    const {context, read, modify} = args
 
-    const sender = args.sender || (context?.getSender() as IUser)
+    const sender: IUser = args.sender || ((await read?.getUserReader().getAppUser()) as IUser)
+
+    const user: IUser = args.user || (context?.getSender() as IUser)
 
     const usernames: Array<string> = [user, sender].map((u: IUser): string => u.username)
 
     const creator: IModifyCreator = modify.getCreator()
 
-    let room: IRoom = (await read?.getRoomReader().getDirectByUsernames(usernames)) as IRoom
+    let room: IRoom | undefined = await read?.getRoomReader().getDirectByUsernames(usernames)
 
     if (room === undefined) {
         const roomId = await creator.finish(
