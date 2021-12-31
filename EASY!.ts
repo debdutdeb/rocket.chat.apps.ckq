@@ -27,6 +27,10 @@ import {IUser} from '@rocket.chat/apps-engine/definition/users'
 
 /* tslint:disable: variable-name */
 
+interface IEasyConfigurationHandlers {
+    setting: EasyAppSetting
+}
+
 class EasyAppCommand implements ISlashCommand {
     public command: string
     public i18nDescription: string
@@ -110,9 +114,9 @@ class EasyAppCommand implements ISlashCommand {
      * No need to pass these through other commands.
      * They'll use the slash's members anyway
      */
-    constructor({app, setting}: {app?: App; setting?: EasyAppSetting}) {
+    constructor(app?: App, cHandlers?: Partial<IEasyConfigurationHandlers>) {
         this.__app = app
-        this.__setting = setting
+        this.__setting = cHandlers?.setting
 
         this.__executor = this.executor
 
@@ -474,7 +478,7 @@ class EasyHelpCommand extends EasyAppCommand {
         = `${'-'.repeat(15)}\n|  *HELP!!*  |\n${'-'.repeat(15)}\n`
 
     constructor() {
-        super({})
+        super()
     }
 
     public unknownCommand: ((args: Array<string>) => Promise<string> | string) | string = (
