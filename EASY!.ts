@@ -537,15 +537,7 @@ type IEasyAppSetting = Optional<ISetting, 'packageValue'> & {
 
 // tslint:disable-next-line: max-classes-per-file
 class EasyAppSetting {
-    [_id: string]: any
-
-    private readonly __app: App
-    private readonly __accessors: IAppAccessors
-
-    constructor(app: App) {
-        this.__app = app
-        this.__accessors = app.getAccessors()
-    }
+    [_id: string]: IEasyAppSettingValue
 
     protected get app(): App {
         return this.__app
@@ -571,19 +563,45 @@ class EasyAppSetting {
         return this.__accessors.providedApiEndpoints
     }
 
-    public async registerSettings(
-        configuration: IConfigurationExtend,
-        settings: Array<IEasyAppSetting>
-    ): Promise<void> {
+    public static async FromSettings(
+        app: App,
+        settings: Array<IEasyAppSetting>,
+        configuration?: IConfigurationExtend
+    ): Promise<EasyAppSetting> {
+        const eas: EasyAppSetting = new EasyAppSetting(app)
         await Promise.all(
             settings.map(async (setting: IEasyAppSetting) => {
                 //
-                this[`get${setting.id}`] = async (): Promise<IEasyAppSettingValue> =>
-                    await this.getValue(setting)
+                Object.defineProperties(eas, {
+                    [setting.id]: {
+                        configurable: false,
+                        enumerable: true,
+                        get(): Promise<IEasyAppSettingValue> {
+                            return this.getValue(setting)
+                        }
+                    },
+                    [`get${setting.id}`]: {
+                        configurable: true,
+                        enumerable: true,
+                        writable: true,
+                        value(): Promise<IEasyAppSettingValue> {
+                            return this.getValue(setting)
+                        }
+                    }
+                })
 
-                await configuration.settings.provideSetting(await this.getSetting(setting))
+                await configuration?.settings.provideSetting(await eas.getSetting(setting))
             })
         )
+        return eas
+    }
+
+    private readonly __app: App
+    private readonly __accessors: IAppAccessors
+
+    constructor(app: App) {
+        this.__app = app
+        this.__accessors = app.getAccessors()
     }
 
     public async getSetting(appSetting: IEasyAppSetting): Promise<ISetting> {
